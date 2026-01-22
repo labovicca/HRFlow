@@ -36,7 +36,7 @@ public class CalculatePayrollCommandHandler : IRequestHandler<CalculatePayrollCo
         }
 
         // Get configuration for calculation
-        var periodDate = new DateTime(payrollRun.Year, payrollRun.Month, 1);
+        var periodDate = new DateTime(payrollRun.Year, payrollRun.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var configuration = await _configurationRepository.GetEffectiveConfigurationAsync(
             payrollRun.EmployeeId, periodDate, cancellationToken);
 
