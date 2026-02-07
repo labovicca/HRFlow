@@ -68,6 +68,8 @@ bld/
 # Rider
 .idea/
 *.sln.iml
+*.sln
+*.http
 
 # Others
 Generated\ Files/
