@@ -19,7 +19,7 @@ public class PayrollRunsController : ControllerBase
     }
 
     /// <summary>
-    /// Get all payroll runs with optional filters
+    /// Dohvati sve payroll run-ove sa opcionalnim filterima
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<PayrollRunListDto>), StatusCodes.Status200OK)]
@@ -36,7 +36,7 @@ public class PayrollRunsController : ControllerBase
     }
 
     /// <summary>
-    /// Get payroll run by ID
+    /// Dohvati payroll run po ID-u
     /// </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(PayrollRunDto), StatusCodes.Status200OK)]
@@ -55,7 +55,7 @@ public class PayrollRunsController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new payroll run
+    /// Kreiraj novi payroll run
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(PayrollRunDto), StatusCodes.Status201Created)]
@@ -64,24 +64,17 @@ public class PayrollRunsController : ControllerBase
         [FromBody] CreatePayrollRunRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            // TODO: Get actual user from JWT token
-            var createdBy = "system";
-            
-            var command = new CreatePayrollRunCommand(request, createdBy);
-            var result = await _mediator.Send(command, cancellationToken);
-            
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        // TODO: Get actual user from JWT token
+        var createdBy = "system";
+        
+        var command = new CreatePayrollRunCommand(request, createdBy);
+        var result = await _mediator.Send(command, cancellationToken);
+        
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
     /// <summary>
-    /// Calculate payroll for a draft payroll run
+    /// Izvrši obračun plate za draft payroll run
     /// </summary>
     [HttpPost("{id:guid}/calculate")]
     [ProducesResponseType(typeof(PayrollCalculationResult), StatusCodes.Status200OK)]
@@ -91,28 +84,17 @@ public class PayrollRunsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            // TODO: Get actual user from JWT token
-            var updatedBy = "system";
-            
-            var command = new CalculatePayrollCommand(id, updatedBy);
-            var result = await _mediator.Send(command, cancellationToken);
-            
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        // TODO: Get actual user from JWT token
+        var updatedBy = "system";
+        
+        var command = new CalculatePayrollCommand(id, updatedBy);
+        var result = await _mediator.Send(command, cancellationToken);
+        
+        return Ok(result);
     }
 
     /// <summary>
-    /// Approve a calculated payroll run
+    /// Odobri obračunati payroll run
     /// </summary>
     [HttpPost("{id:guid}/approve")]
     [ProducesResponseType(typeof(PayrollRunDto), StatusCodes.Status200OK)]
@@ -122,28 +104,55 @@ public class PayrollRunsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            // TODO: Get actual user from JWT token
-            var approvedBy = "system";
-            
-            var command = new ApprovePayrollRunCommand(id, approvedBy);
-            var result = await _mediator.Send(command, cancellationToken);
-            
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        // TODO: Get actual user from JWT token
+        var approvedBy = "system";
+        
+        var command = new ApprovePayrollRunCommand(id, approvedBy);
+        var result = await _mediator.Send(command, cancellationToken);
+        
+        return Ok(result);
     }
 
     /// <summary>
-    /// Delete a draft or cancelled payroll run
+    /// Generiši payslip PDF za payroll run
+    /// </summary>
+    [HttpPost("{id:guid}/payslip")]
+    [ProducesResponseType(typeof(PayslipDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PayslipDto>> GeneratePayslip(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var generatedBy = "system";
+        var command = new GeneratePayslipCommand(id, generatedBy);
+        var result = await _mediator.Send(command, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Preuzmi payslip PDF za payroll run
+    /// </summary>
+    [HttpGet("{id:guid}/payslip/download")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadPayslip(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var query = new DownloadPayslipQuery(id);
+        var result = await _mediator.Send(query, cancellationToken);
+
+        if (result == null)
+        {
+            return NotFound(new { message = "Payslip nije dostupan za ovaj payroll run" });
+        }
+
+        return File(result.FileBytes, result.ContentType, result.FileName);
+    }
+
+    /// <summary>
+    /// Obriši draft ili cancelled payroll run
     /// </summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -151,20 +160,9 @@ public class PayrollRunsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            var command = new DeletePayrollRunCommand(id);
-            await _mediator.Send(command, cancellationToken);
-            
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var command = new DeletePayrollRunCommand(id);
+        await _mediator.Send(command, cancellationToken);
+        
+        return NoContent();
     }
 }

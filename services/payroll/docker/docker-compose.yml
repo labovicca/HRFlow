@@ -18,6 +18,25 @@ services:
     networks:
       - payroll-network
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: payroll-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - payroll-network
+
   payroll-service:
     build:
       context: ..
@@ -28,14 +47,21 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__PayrollDb=Host=postgres-payroll;Port=5432;Database=payroll_db;Username=payroll_user;Password=payroll_pass
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
     depends_on:
       postgres-payroll:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - payroll-network
 
 volumes:
   payroll_data:
+  rabbitmq_data:
 
 networks:
   payroll-network:

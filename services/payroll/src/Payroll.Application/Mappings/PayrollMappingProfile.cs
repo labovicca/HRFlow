@@ -18,6 +18,9 @@ public class PayrollMappingProfile : Profile
         CreateMap<SalaryComponent, SalaryComponentDto>()
             .ForMember(dest => dest.ComponentType, opt => opt.MapFrom(src => src.ComponentType.ToString()));
         
+        // Payslip mappings
+        CreateMap<Payslip, PayslipDto>();
+        
         // PayrollConfiguration mappings
         CreateMap<PayrollConfiguration, PayrollConfigurationDto>();
         
