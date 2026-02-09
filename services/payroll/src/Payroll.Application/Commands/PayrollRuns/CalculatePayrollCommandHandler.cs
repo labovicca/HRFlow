@@ -1,5 +1,6 @@
 using MediatR;
 using Payroll.Application.DTOs;
+using Payroll.Application.Events;
 using Payroll.Application.Interfaces;
 using Payroll.Domain.Enums;
 
@@ -10,15 +11,18 @@ public class CalculatePayrollCommandHandler : IRequestHandler<CalculatePayrollCo
     private readonly IPayrollRunRepository _payrollRunRepository;
     private readonly IPayrollConfigurationRepository _configurationRepository;
     private readonly IPayrollCalculator _payrollCalculator;
+    private readonly IEventPublisher _eventPublisher;
 
     public CalculatePayrollCommandHandler(
         IPayrollRunRepository payrollRunRepository,
         IPayrollConfigurationRepository configurationRepository,
-        IPayrollCalculator payrollCalculator)
+        IPayrollCalculator payrollCalculator,
+        IEventPublisher eventPublisher)
     {
         _payrollRunRepository = payrollRunRepository;
         _configurationRepository = configurationRepository;
         _payrollCalculator = payrollCalculator;
+        _eventPublisher = eventPublisher;
     }
 
     public async Task<PayrollCalculationResult> Handle(CalculatePayrollCommand command, CancellationToken cancellationToken)
@@ -58,6 +62,19 @@ public class CalculatePayrollCommandHandler : IRequestHandler<CalculatePayrollCo
         payrollRun.UpdatedBy = command.UpdatedBy;
 
         await _payrollRunRepository.UpdateAsync(payrollRun, cancellationToken);
+
+        // Publish event to RabbitMQ
+        await _eventPublisher.PublishAsync(new PayrollCalculatedEvent
+        {
+            PayrollRunId = payrollRun.Id,
+            EmployeeId = payrollRun.EmployeeId,
+            Year = payrollRun.Year,
+            Month = payrollRun.Month,
+            GrossSalary = result.GrossSalary,
+            NetSalary = result.NetSalary,
+            TotalDeductions = result.TotalDeductions,
+            CalculatedAt = DateTime.UtcNow
+        }, cancellationToken);
 
         return result;
     }

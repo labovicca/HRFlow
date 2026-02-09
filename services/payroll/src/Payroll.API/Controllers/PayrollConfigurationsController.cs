@@ -18,7 +18,7 @@ public class PayrollConfigurationsController : ControllerBase
     }
 
     /// <summary>
-    /// Get all payroll configurations
+    /// Dohvati sve payroll konfiguracije
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<PayrollConfigurationDto>), StatusCodes.Status200OK)]
@@ -32,7 +32,7 @@ public class PayrollConfigurationsController : ControllerBase
     }
 
     /// <summary>
-    /// Get payroll configuration by ID
+    /// Dohvati payroll konfiguraciju po ID-u
     /// </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(PayrollConfigurationDto), StatusCodes.Status200OK)]
@@ -53,7 +53,7 @@ public class PayrollConfigurationsController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new payroll configuration
+    /// Kreiraj novu payroll konfiguraciju
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(PayrollConfigurationDto), StatusCodes.Status201Created)]
@@ -62,24 +62,17 @@ public class PayrollConfigurationsController : ControllerBase
         [FromBody] CreatePayrollConfigurationRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            // TODO: Get actual user from JWT token
-            var createdBy = "system";
-            
-            var command = new CreatePayrollConfigurationCommand(request, createdBy);
-            var result = await _mediator.Send(command, cancellationToken);
-            
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        // TODO: Get actual user from JWT token
+        var createdBy = "system";
+        
+        var command = new CreatePayrollConfigurationCommand(request, createdBy);
+        var result = await _mediator.Send(command, cancellationToken);
+        
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
     /// <summary>
-    /// Update an existing payroll configuration
+    /// Ažuriraj postojeću payroll konfiguraciju
     /// </summary>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(PayrollConfigurationDto), StatusCodes.Status200OK)]
@@ -90,44 +83,26 @@ public class PayrollConfigurationsController : ControllerBase
         [FromBody] UpdatePayrollConfigurationRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            // TODO: Get actual user from JWT token
-            var updatedBy = "system";
-            
-            var command = new UpdatePayrollConfigurationCommand(id, request, updatedBy);
-            var result = await _mediator.Send(command, cancellationToken);
-            
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        // TODO: Get actual user from JWT token
+        var updatedBy = "system";
+        
+        var command = new UpdatePayrollConfigurationCommand(id, request, updatedBy);
+        var result = await _mediator.Send(command, cancellationToken);
+        
+        return Ok(result);
     }
 
     /// <summary>
-    /// Delete a payroll configuration
+    /// Obriši payroll konfiguraciju
     /// </summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            var command = new DeletePayrollConfigurationCommand(id);
-            await _mediator.Send(command, cancellationToken);
-            
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        var command = new DeletePayrollConfigurationCommand(id);
+        await _mediator.Send(command, cancellationToken);
+        
+        return NoContent();
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Payroll.API.Middleware;
 using Payroll.Application;
 using Payroll.Infrastructure;
 using Payroll.Infrastructure.Persistence;
@@ -25,6 +26,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Payroll Service API v1"));
 }
+
+// Global exception handling middleware
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();
 app.UseAuthorization();

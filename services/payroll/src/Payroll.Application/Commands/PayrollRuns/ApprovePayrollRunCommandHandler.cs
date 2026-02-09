@@ -1,6 +1,7 @@
 using AutoMapper;
 using MediatR;
 using Payroll.Application.DTOs;
+using Payroll.Application.Events;
 using Payroll.Application.Interfaces;
 using Payroll.Domain.Enums;
 
@@ -10,13 +11,16 @@ public class ApprovePayrollRunCommandHandler : IRequestHandler<ApprovePayrollRun
 {
     private readonly IPayrollRunRepository _payrollRunRepository;
     private readonly IMapper _mapper;
+    private readonly IEventPublisher _eventPublisher;
 
     public ApprovePayrollRunCommandHandler(
         IPayrollRunRepository payrollRunRepository,
-        IMapper mapper)
+        IMapper mapper,
+        IEventPublisher eventPublisher)
     {
         _payrollRunRepository = payrollRunRepository;
         _mapper = mapper;
+        _eventPublisher = eventPublisher;
     }
 
     public async Task<PayrollRunDto> Handle(ApprovePayrollRunCommand command, CancellationToken cancellationToken)
@@ -38,6 +42,20 @@ public class ApprovePayrollRunCommandHandler : IRequestHandler<ApprovePayrollRun
         payrollRun.UpdatedBy = command.ApprovedBy;
 
         await _payrollRunRepository.UpdateAsync(payrollRun, cancellationToken);
+
+        // Publish event to RabbitMQ
+        await _eventPublisher.PublishAsync(new PayrollApprovedEvent
+        {
+            PayrollRunId = payrollRun.Id,
+            EmployeeId = payrollRun.EmployeeId,
+            Year = payrollRun.Year,
+            Month = payrollRun.Month,
+            GrossSalary = payrollRun.GrossSalary,
+            NetSalary = payrollRun.NetSalary,
+            TotalDeductions = payrollRun.TotalDeductions,
+            ApprovedBy = command.ApprovedBy,
+            ApprovedAt = DateTime.UtcNow
+        }, cancellationToken);
 
         return _mapper.Map<PayrollRunDto>(payrollRun);
     }
