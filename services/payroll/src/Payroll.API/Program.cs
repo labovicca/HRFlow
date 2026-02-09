@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Payroll.API.Middleware;
+using Payroll.Application;
+using Payroll.Infrastructure;
 using Payroll.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,12 +14,9 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "Payroll Service API", Version = "v1" });
 });
 
-// Database
-builder.Services.AddDbContext<PayrollDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("PayrollDb"),
-        npgsqlOptions => npgsqlOptions.MigrationsAssembly("Payroll.Infrastructure")
-    ));
+// Add Application and Infrastructure layers
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
@@ -26,6 +26,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Payroll Service API v1"));
 }
+
+// Global exception handling middleware
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
