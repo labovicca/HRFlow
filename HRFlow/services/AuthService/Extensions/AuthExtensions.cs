@@ -4,21 +4,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AuthenticationService.Data;
-using AuthenticationService.Entities;
+using AuthService.Data;
+using AuthService.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 
-namespace AuthenticationService.Extensions
+namespace AuthService.Extensions
 {
-    public static class AuthenticationExtensions
+    public static class AuthExtensions
     {
 
         public static IServiceCollection ConfigurePersistence(this IServiceCollection services,
             IConfiguration configuration)
         {
-            services.AddDbContext<AuthenticationContext>(options =>
+            services.AddDbContext<AuthContext>(options =>
             {
                 options.UseSqlServer(configuration.GetConnectionString("IdentityConnection"));
             });
@@ -34,7 +34,7 @@ namespace AuthenticationService.Extensions
                     options.Password.RequireUppercase = true;
                     options.Password.RequiredLength = 8;
                     options.User.RequireUniqueEmail = true;
-                }).AddEntityFrameworkStores<AuthenticationContext>()
+                }).AddEntityFrameworkStores<AuthContext>()
                 .AddDefaultTokenProviders();
             return services;
         }

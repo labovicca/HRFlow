@@ -2,16 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AuthenticationService.Entities;
+using AuthService.Entities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
-namespace AuthenticationService.Data
+namespace AuthService.Data
 {
-    public class AuthenticationContext : IdentityDbContext<User>
+    public class AuthContext : IdentityDbContext<User>
     {
 
-        public AuthenticationContext(DbContextOptions options)
+        public AuthContext(DbContextOptions options)
         {
             
         }
