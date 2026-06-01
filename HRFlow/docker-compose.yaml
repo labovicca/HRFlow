@@ -4,8 +4,13 @@
     ports:
       - "8001:8080"
     build:
-      context: .
-      dockerfile: Services/AuthService/Dockerfile
+      context: ../services/AuthService
+      dockerfile: docker/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__AuthDb=Server=auth_db;Database=AuthDb;User Id=sa;Password=admin_hr_flow123;TrustServerCertificate=True;
+    depends_on:
+      - auth_db
 
   auth_db:
     container_name: auth_db
