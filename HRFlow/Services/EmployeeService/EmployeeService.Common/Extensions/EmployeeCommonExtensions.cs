@@ -19,6 +19,11 @@ public static class EmployeeCommonExtensions
         
         services.AddAutoMapper(cfg =>
         {
+            cfg.CreateMap<Employee, EmployeeForPayrollDto>()
+                .ForMember(dest => dest.EmploymentType,
+                    opt => opt.MapFrom(src => src.EmploymentType.ToString()))
+                .ForMember(dest => dest.EmploymentStatus,
+                    opt => opt.MapFrom(src => src.EmploymentStatus.ToString()));
             cfg.CreateMap<Employee, EmployeeDto>()
                 .ForMember(dest => dest.EmploymentType,
                     opt => opt.MapFrom(src => src.EmploymentType.ToString()))
