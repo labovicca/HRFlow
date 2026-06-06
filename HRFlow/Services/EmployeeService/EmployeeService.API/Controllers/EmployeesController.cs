@@ -1,3 +1,4 @@
+using EmployeeService.Common.DTOs;
 using EmployeeService.Common.DTOs.Employee;
 using EmployeeService.Common.Enums;
 using EmployeeService.Common.Repositories;
@@ -7,6 +8,8 @@ namespace EmployeeService.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Produces("application/json")]
+[ProducesResponseType(StatusCodes.Status500InternalServerError)]
 public class EmployeesController : ControllerBase
 {
     private readonly IEmployeeRepository _repository;
@@ -19,6 +22,7 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<EmployeeDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<EmployeeDto>>> GetAll()
     {
         try
@@ -34,6 +38,8 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(EmployeeDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EmployeeDto>> GetById(int id)
     {
         try
@@ -52,6 +58,8 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet("number/{employeeNumber}")]
+    [ProducesResponseType(typeof(EmployeeDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EmployeeDto>> GetByEmployeeNumber(string employeeNumber)
     {
         try
@@ -69,7 +77,64 @@ public class EmployeesController : ControllerBase
         }
     }
 
+    [HttpGet("{id}/payroll")]
+    [ProducesResponseType(typeof(EmployeeForPayrollDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<EmployeeForPayrollDto>> GetForPayroll(int id)
+    {
+        try
+        {
+            var employee = await _repository.GetForPayrollAsync(id);
+            if (employee == null)
+                return NotFound($"Employee with ID {id} not found");
+
+            return Ok(employee);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting employee payroll data: {Id}", id);
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    [HttpPost("payroll/bulk")]
+    [ProducesResponseType(typeof(IEnumerable<EmployeeForPayrollDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<IEnumerable<EmployeeForPayrollDto>>> GetForPayrollBulk([FromBody] int[] employeeIds)
+    {
+        try
+        {
+            if (employeeIds.Length == 0)
+                return BadRequest("At least one employee ID is required");
+
+            var employees = await _repository.GetForPayrollAsync(employeeIds);
+            return Ok(employees);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting employee payroll data in bulk");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    [HttpGet("{id}/exists")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> Exists(int id)
+    {
+        try
+        {
+            var exists = await _repository.ExistsAsync(id);
+            return Ok(new { id, exists });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking employee existence: {Id}", id);
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
     [HttpGet("department/{department}")]
+    [ProducesResponseType(typeof(IEnumerable<EmployeeDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<EmployeeDto>>> GetByDepartment(string department)
     {
         try
@@ -85,6 +150,7 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet("manager/{managerId}")]
+    [ProducesResponseType(typeof(IEnumerable<EmployeeDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<EmployeeDto>>> GetByManagerId(int managerId)
     {
         try
@@ -100,6 +166,7 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet("status/{status}")]
+    [ProducesResponseType(typeof(IEnumerable<EmployeeDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<EmployeeDto>>> GetByStatus(EmploymentStatus status)
     {
         try
@@ -115,6 +182,7 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet("type/{type}")]
+    [ProducesResponseType(typeof(IEnumerable<EmployeeDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<EmployeeDto>>> GetByType(EmploymentType type)
     {
         try
@@ -129,7 +197,31 @@ public class EmployeesController : ControllerBase
         }
     }
 
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(PagedResultDto<EmployeeDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResultDto<EmployeeDto>>> Search(
+        [FromQuery] string? search,
+        [FromQuery] string? department,
+        [FromQuery] EmploymentStatus? status,
+        [FromQuery] EmploymentType? type,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            var result = await _repository.SearchAsync(search, department, status, type, page, pageSize);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching employees");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
     [HttpPost]
+    [ProducesResponseType(typeof(EmployeeDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<EmployeeDto>> Create([FromBody] CreateEmployeeDto dto)
     {
         try
@@ -152,6 +244,9 @@ public class EmployeesController : ControllerBase
     }
     
     [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Update(int id, [FromBody] UpdateEmployeeDto dto)
     {
         try
@@ -176,6 +271,8 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpPatch("{id}/status")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> UpdateStatus(int id, [FromBody] EmploymentStatus status)
     {
         try
@@ -194,6 +291,8 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpPatch("{id}/type")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> UpdateType(int id, [FromBody] EmploymentType type)
     {
         try
@@ -212,6 +311,8 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Delete(int id)
     {
         try
@@ -230,6 +331,9 @@ public class EmployeesController : ControllerBase
     }
     
     [HttpPatch("{id}/terminate")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> TerminateEmployee(int id, [FromBody] DateTime terminationDate)
     {
         try
