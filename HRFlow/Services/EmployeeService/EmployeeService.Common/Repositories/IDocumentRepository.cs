@@ -13,7 +13,7 @@ public interface IDocumentRepository
     Task<IEnumerable<DocumentDto>> GetExpiringDocumentsAsync(DateTime beforeDate);
     Task<IEnumerable<DocumentDto>> GetByStatusAsync(DocumentStatus status);
 
-    Task<bool> CreateAsync(CreateDocumentDto document);
+    Task<DocumentDto?> CreateAsync(CreateDocumentDto document);
     Task<bool> UpdateAsync(UpdateDocumentDto document);
     Task<bool> DeleteAsync(int id);
     

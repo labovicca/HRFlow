@@ -26,11 +26,15 @@ public static class DocumentCommonExtensions
             
             cfg.CreateMap<DocumentDto, Document>()
                 .ForMember(dest => dest.Type,
-                    opt => opt.MapFrom(src => 
-                        Enum.Parse<DocumentType>(src.Type)))
+                    opt => opt.MapFrom(src =>
+                        string.IsNullOrEmpty(src.Type)
+                            ? DocumentType.Other
+                            : Enum.Parse<DocumentType>(src.Type)))
                 .ForMember(dest => dest.Status,
-                    opt => opt.MapFrom(src => 
-                        Enum.Parse<DocumentStatus>(src.Status)));
+                    opt => opt.MapFrom(src =>
+                        string.IsNullOrEmpty(src.Status)
+                            ? DocumentStatus.Uploaded
+                            : Enum.Parse<DocumentStatus>(src.Status)));
             
             cfg.CreateMap<Document, BaseIdentityDocumentDto>()
                 .ForMember(dest => dest.Type,
@@ -66,7 +70,12 @@ public static class DocumentCommonExtensions
                     opt => opt.MapFrom(src => 
                         string.IsNullOrEmpty(src.Type) 
                             ? DocumentType.Other 
-                            : Enum.Parse<DocumentType>(src.Type)));
+                            : Enum.Parse<DocumentType>(src.Type)))
+                .ForMember(dest => dest.Status,
+                    opt => opt.MapFrom(src =>
+                        string.IsNullOrEmpty(src.Status)
+                            ? DocumentStatus.Uploaded
+                            : Enum.Parse<DocumentStatus>(src.Status)));
         });
     }
 }
