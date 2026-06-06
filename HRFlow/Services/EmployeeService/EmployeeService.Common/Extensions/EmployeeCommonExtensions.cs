@@ -13,6 +13,7 @@ public static class EmployeeCommonExtensions
     public static void AddEmployeeServices(this IServiceCollection services)
     {
         services.AddScoped<IEmployeeContext, EmployeeContext>();
+        services.AddScoped<IEmployeeDatabaseInitializer, EmployeeDatabaseInitializer>();
         
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         

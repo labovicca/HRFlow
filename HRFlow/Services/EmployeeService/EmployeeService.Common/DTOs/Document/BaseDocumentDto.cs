@@ -22,4 +22,8 @@ public class BaseDocumentDto
     
     [DataType(DataType.Date)]
     public DateTime? ExpirationDate { get; set; }
+
+    public string? OriginalFileName { get; set; }
+    public string? ContentType { get; set; }
+    public long? FileSize { get; set; }
 }
