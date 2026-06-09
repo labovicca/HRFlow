@@ -5,9 +5,9 @@ namespace EmployeeService.API.HealthChecks;
 
 public class PostgresHealthCheck : IHealthCheck
 {
-    private readonly IEmployeeContext _context;
+    private readonly EmployeeDbContext _context;
 
-    public PostgresHealthCheck(IEmployeeContext context)
+    public PostgresHealthCheck(EmployeeDbContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
@@ -18,13 +18,9 @@ public class PostgresHealthCheck : IHealthCheck
     {
         try
         {
-            await using var connection = _context.GetConnection();
-            await connection.OpenAsync(cancellationToken);
-            await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT 1";
-            await command.ExecuteScalarAsync(cancellationToken);
-
-            return HealthCheckResult.Healthy("PostgreSQL connection is healthy.");
+            return await _context.Database.CanConnectAsync(cancellationToken)
+                ? HealthCheckResult.Healthy("PostgreSQL connection is healthy.")
+                : HealthCheckResult.Unhealthy("PostgreSQL connection is unhealthy.");
         }
         catch (Exception ex)
         {

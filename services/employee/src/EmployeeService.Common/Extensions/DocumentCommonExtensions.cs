@@ -12,8 +12,6 @@ public static class DocumentCommonExtensions
 {
     public static void AddDocumentServices(this IServiceCollection services)
     {
-        services.AddScoped<IEmployeeContext, EmployeeContext>();
-        
         services.AddScoped<IDocumentRepository, DocumentRepository>();
         
         services.AddAutoMapper(cfg =>

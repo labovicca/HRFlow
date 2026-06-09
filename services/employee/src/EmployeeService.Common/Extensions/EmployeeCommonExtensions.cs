@@ -5,15 +5,17 @@ using EmployeeService.Common.Enums;
 using EmployeeService.Common.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using AutoMapper;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace EmployeeService.Common.Extensions;
 
 public static class EmployeeCommonExtensions
 {
-    public static void AddEmployeeServices(this IServiceCollection services)
+    public static void AddEmployeeServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<IEmployeeContext, EmployeeContext>();
-        services.AddScoped<IEmployeeDatabaseInitializer, EmployeeDatabaseInitializer>();
+        services.AddDbContext<EmployeeDbContext>(options =>
+            options.UseNpgsql(configuration.GetValue<string>("DatabaseSettings:ConnectionString")));
         
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         
