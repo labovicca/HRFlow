@@ -8,6 +8,7 @@ service EmployeeProtoService {
   rpc GetEmployeeForPayroll (GetEmployeeForPayrollRequest) returns (EmployeeForPayrollResponse);
   rpc GetEmployeesForPayroll (GetEmployeesForPayrollRequest) returns (GetEmployeesForPayrollResponse);
   rpc EmployeeExists (EmployeeExistsRequest) returns (EmployeeExistsResponse);
+  rpc GetLeaveApprovers (GetLeaveApproversRequest) returns (LeaveApproversResponse);
 }
 
 message GetEmployeeForPayrollRequest {
@@ -41,4 +42,18 @@ message EmployeeExistsRequest {
 
 message EmployeeExistsResponse {
   bool exists = 1;
+}
+
+message GetLeaveApproversRequest {
+  int32 employeeId = 1;
+}
+
+message LeaveApproversResponse {
+  int32 employeeId = 1;
+  string employeeNumber = 2;
+  int32 managerId = 3;
+  string managerEmployeeNumber = 4;
+  int32 hrEmployeeId = 5;
+  string hrEmployeeNumber = 6;
+  string department = 7;
 }

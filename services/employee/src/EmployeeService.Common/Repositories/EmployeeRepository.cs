@@ -1,31 +1,19 @@
 using AutoMapper;
-using Dapper;
 using EmployeeService.Common.Data;
 using EmployeeService.Common.DTOs;
 using EmployeeService.Common.DTOs.Employee;
 using EmployeeService.Common.Entities;
 using EmployeeService.Common.Enums;
-using Npgsql;
-
+using Microsoft.EntityFrameworkCore;
 
 namespace EmployeeService.Common.Repositories;
 
 public class EmployeeRepository : IEmployeeRepository
 {
-    private readonly IEmployeeContext _context;
+    private readonly EmployeeDbContext _context;
     private readonly IMapper _mapper;
-    
 
-    private async Task<string> GenerateEmployeeNumberAsync(NpgsqlConnection connection)
-    
-    {
-        const string sql = "SELECT nextval('employee_number_seq')";
-        var nextVal = await connection.ExecuteScalarAsync<long>(sql);
-        return $"EMP-{nextVal:D6}";
-    }
-
-
-    public EmployeeRepository(IEmployeeContext context, IMapper mapper)
+    public EmployeeRepository(EmployeeDbContext context, IMapper mapper)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -33,40 +21,28 @@ public class EmployeeRepository : IEmployeeRepository
 
     public async Task<EmployeeDto?> GetByIdAsync(int id)
     {
-        using var connection = _context.GetConnection();
-        const string sql = "SELECT * FROM Employee WHERE Id = @Id AND IsDeleted = FALSE";
-        var employee = await connection.QueryFirstOrDefaultAsync<Employee>(sql, new { Id = id });
+        var employee = await ActiveEmployees()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id);
+
         return _mapper.Map<EmployeeDto?>(employee);
     }
 
     public async Task<EmployeeDto?> GetByEmployeeNumberAsync(string employeeNumber)
     {
-        using var connection = _context.GetConnection();
-        const string sql = "SELECT * FROM Employee WHERE EmployeeNumber = @EmployeeNumber AND IsDeleted = FALSE";
-        var employee = await connection.QueryFirstOrDefaultAsync<Employee>(sql, new { EmployeeNumber = employeeNumber });
+        var employee = await ActiveEmployees()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+
         return _mapper.Map<EmployeeDto?>(employee);
     }
 
     public async Task<EmployeeForPayrollDto?> GetForPayrollAsync(int id)
     {
-        using var connection = _context.GetConnection();
-        const string sql = """
-            SELECT
-                Id,
-                EmployeeNumber,
-                FirstName,
-                LastName,
-                Department,
-                Position,
-                EmploymentType,
-                EmploymentStatus,
-                HireDate,
-                TerminationDate
-            FROM Employee
-            WHERE Id = @Id AND IsDeleted = FALSE
-        """;
+        var employee = await ActiveEmployees()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id);
 
-        var employee = await connection.QueryFirstOrDefaultAsync<Employee>(sql, new { Id = id });
         return _mapper.Map<EmployeeForPayrollDto?>(employee);
     }
 
@@ -78,253 +54,264 @@ public class EmployeeRepository : IEmployeeRepository
             return Enumerable.Empty<EmployeeForPayrollDto>();
         }
 
-        using var connection = _context.GetConnection();
-        const string sql = """
-            SELECT
-                Id,
-                EmployeeNumber,
-                FirstName,
-                LastName,
-                Department,
-                Position,
-                EmploymentType,
-                EmploymentStatus,
-                HireDate,
-                TerminationDate
-            FROM Employee
-            WHERE Id = ANY(@Ids) AND IsDeleted = FALSE
-        """;
+        var employees = await ActiveEmployees()
+            .AsNoTracking()
+            .Where(e => employeeIds.Contains(e.Id))
+            .ToListAsync();
 
-        var employees = await connection.QueryAsync<Employee>(sql, new { Ids = employeeIds });
         return _mapper.Map<IEnumerable<EmployeeForPayrollDto>>(employees);
     }
 
-    public async Task<bool> ExistsAsync(int id)
+    public Task<bool> ExistsAsync(int id)
     {
-        using var connection = _context.GetConnection();
-        const string sql = "SELECT EXISTS(SELECT 1 FROM Employee WHERE Id = @Id AND IsDeleted = FALSE)";
-        return await connection.ExecuteScalarAsync<bool>(sql, new { Id = id });
+        return ActiveEmployees().AnyAsync(e => e.Id == id);
     }
 
     public async Task<IEnumerable<EmployeeDto>> GetAllAsync()
     {
-        using var connection = _context.GetConnection();
-        const string sql = "SELECT * FROM Employee WHERE IsDeleted = FALSE";
-        var employees = await connection.QueryAsync<Employee>(sql);
+        var employees = await ActiveEmployees()
+            .AsNoTracking()
+            .ToListAsync();
+
         return _mapper.Map<IEnumerable<EmployeeDto>>(employees);
     }
 
     public async Task<IEnumerable<EmployeeDto>> GetByDepartmentAsync(string department)
     {
-        using var connection = _context.GetConnection();
-        const string sql = "SELECT * FROM Employee WHERE Department = @Department AND IsDeleted = FALSE";
-        var employees = await connection.QueryAsync<Employee>(sql, new { Department = department });
+        var employees = await ActiveEmployees()
+            .AsNoTracking()
+            .Where(e => e.Department == department)
+            .ToListAsync();
+
         return _mapper.Map<IEnumerable<EmployeeDto>>(employees);
     }
 
     public async Task<IEnumerable<EmployeeDto>> GetByManagerIdAsync(int managerId)
     {
-        using var connection = _context.GetConnection();
-        const string sql = "SELECT * FROM Employee WHERE ManagerId = @ManagerId AND IsDeleted = FALSE";
-        var employees = await connection.QueryAsync<Employee>(sql, new { ManagerId = managerId });
+        var employees = await ActiveEmployees()
+            .AsNoTracking()
+            .Where(e => e.ManagerId == managerId)
+            .ToListAsync();
+
         return _mapper.Map<IEnumerable<EmployeeDto>>(employees);
+    }
+
+    public async Task<LeaveApproversDto?> GetLeaveApproversAsync(int employeeId)
+    {
+        var employee = await ActiveEmployees()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == employeeId);
+        if (employee == null)
+        {
+            return null;
+        }
+
+        if (!employee.ManagerId.HasValue)
+        {
+            throw new InvalidOperationException($"Employee {employeeId} does not have a manager assigned");
+        }
+
+        var manager = await ActiveEmployees()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == employee.ManagerId.Value);
+        if (manager == null)
+        {
+            throw new InvalidOperationException($"Manager {employee.ManagerId.Value} is not an active employee");
+        }
+
+        var hr = await _context.DepartmentHrAssignments
+            .AsNoTracking()
+            .Where(a => a.Department == employee.Department)
+            .Join(
+                ActiveEmployees().AsNoTracking().Where(e => e.Role == EmployeeRole.Hr),
+                assignment => assignment.HrEmployeeId,
+                hrEmployee => hrEmployee.Id,
+                (_, hrEmployee) => hrEmployee)
+            .FirstOrDefaultAsync();
+        if (hr == null)
+        {
+            throw new InvalidOperationException($"Department {employee.Department} does not have an active HR partner assigned");
+        }
+
+        return new LeaveApproversDto
+        {
+            EmployeeId = employee.Id,
+            EmployeeNumber = employee.EmployeeNumber,
+            ManagerId = manager.Id,
+            ManagerEmployeeNumber = manager.EmployeeNumber,
+            HrEmployeeId = hr.Id,
+            HrEmployeeNumber = hr.EmployeeNumber,
+            Department = employee.Department
+        };
     }
 
     public async Task<IEnumerable<EmployeeDto>> GetByStatusAsync(EmploymentStatus status)
     {
-        using var connection = _context.GetConnection();
-        const string sql = "SELECT * FROM Employee WHERE EmploymentStatus = @Status AND IsDeleted = FALSE";
-        var employees = await connection.QueryAsync<Employee>(sql, new { Status = (int)status });
+        var employees = await ActiveEmployees()
+            .AsNoTracking()
+            .Where(e => e.EmploymentStatus == status)
+            .ToListAsync();
+
         return _mapper.Map<IEnumerable<EmployeeDto>>(employees);
     }
 
     public async Task<EmployeeDto?> CreateAsync(CreateEmployeeDto dto)
     {
-        using var connection = _context.GetConnection();
+        var employee = _mapper.Map<Employee>(dto);
+        employee.EmployeeNumber = await GenerateEmployeeNumberAsync();
+        employee.CreatedAt = DateTime.UtcNow;
+        employee.CreatedBy = "system";
+        employee.IsDeleted = false;
 
-        var employeeNumber = await GenerateEmployeeNumberAsync(connection);
+        _context.Employees.Add(employee);
+        await _context.SaveChangesAsync();
 
-        const string sql = """
-                               INSERT INTO Employee 
-                               (EmployeeNumber, FirstName, LastName, WorkEmail, PersonalEmail, PhoneNumber, DateOfBirth, JMBG,
-                                Department, Position, ManagerId, EmploymentType, EmploymentStatus, HireDate, ProbationEndDate, CreatedAt, CreatedBy)
-                               VALUES 
-                               (@EmployeeNumber, @FirstName, @LastName, @WorkEmail, @PersonalEmail, @PhoneNumber, @DateOfBirth, @JMBG,
-                                @Department, @Position, @ManagerId, @EmploymentType, @EmploymentStatus, @HireDate, @ProbationEndDate, @CreatedAt, @CreatedBy)
-                               RETURNING *;
-                           """;
-
-        var createdEmployee = await connection.QuerySingleOrDefaultAsync<Employee>(sql, new
-        {
-            EmployeeNumber = employeeNumber,
-            dto.FirstName,
-            dto.LastName,
-            dto.WorkEmail,
-            dto.PersonalEmail,
-            dto.PhoneNumber,
-            dto.DateOfBirth,
-            dto.JMBG,
-            dto.Department,
-            dto.Position,
-            dto.ManagerId,
-            EmploymentType = (int)dto.EmploymentType,
-            EmploymentStatus = (int)dto.EmploymentStatus,
-            dto.HireDate,
-            dto.ProbationEndDate,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = "system"
-        });
-
-        if (createdEmployee == null)
-            return null;
-
-        return _mapper.Map<EmployeeDto>(createdEmployee);
+        return _mapper.Map<EmployeeDto>(employee);
     }
+
     public async Task<bool> UpdateAsync(UpdateEmployeeDto dto)
     {
-        using var connection = _context.GetConnection();
-        const string sql = """
-            UPDATE Employee
-            SET FirstName=@FirstName, LastName=@LastName, WorkEmail=@WorkEmail, PersonalEmail=@PersonalEmail,
-                PhoneNumber=@PhoneNumber, DateOfBirth=@DateOfBirth, JMBG=@JMBG,
-                Department=@Department, Position=@Position, ManagerId=@ManagerId,
-                EmploymentType=@EmploymentType, EmploymentStatus=@EmploymentStatus,
-                TerminationDate=@TerminationDate, ProbationEndDate=@ProbationEndDate,
-                UpdatedAt=@UpdatedAt, UpdatedBy=@UpdatedBy
-            WHERE Id=@Id AND IsDeleted = FALSE
-        """;
-
-        var affected = await connection.ExecuteAsync(sql, new
+        var employee = await ActiveEmployees().FirstOrDefaultAsync(e => e.Id == dto.Id);
+        if (employee == null)
         {
-            dto.Id,
-            dto.FirstName,
-            dto.LastName,
-            dto.WorkEmail,
-            dto.PersonalEmail,
-            dto.PhoneNumber,
-            dto.DateOfBirth,
-            dto.JMBG,
-            dto.Department,
-            dto.Position,
-            dto.ManagerId,
-            EmploymentType = (int)dto.EmploymentType,
-            EmploymentStatus = (int)dto.EmploymentStatus,
-            dto.TerminationDate,
-            dto.ProbationEndDate,
-            UpdatedAt = DateTime.UtcNow,
-            UpdatedBy = "system"
-        });
-        
-        return affected > 0;
+            return false;
+        }
+
+        _mapper.Map(dto, employee);
+        employee.UpdatedAt = DateTime.UtcNow;
+        employee.UpdatedBy = "system";
+
+        return await _context.SaveChangesAsync() > 0;
     }
 
     public async Task<bool> DeleteAsync(int id)
     {
-        using var connection = _context.GetConnection();
-        const string sql = """
-            UPDATE Employee
-            SET IsDeleted = TRUE,
-                DeletedAt = @DeletedAt,
-                DeletedBy = @DeletedBy
-            WHERE Id = @Id AND IsDeleted = FALSE
-        """;
-        var affected = await connection.ExecuteAsync(sql, new
+        var employee = await ActiveEmployees().FirstOrDefaultAsync(e => e.Id == id);
+        if (employee == null)
         {
-            Id = id,
-            DeletedAt = DateTime.UtcNow,
-            DeletedBy = "system"
-        });
-        return affected > 0;
+            return false;
+        }
+
+        employee.IsDeleted = true;
+        employee.DeletedAt = DateTime.UtcNow;
+        employee.DeletedBy = "system";
+
+        return await _context.SaveChangesAsync() > 0;
     }
-    
+
     public async Task<bool> UpdateStatusAsync(int employeeId, EmploymentStatus status)
     {
-        using var connection = _context.GetConnection();
-
-        const string sql = """
-                               UPDATE Employee
-                               SET EmploymentStatus = @Status,
-                                   UpdatedAt = @UpdatedAt,
-                                   UpdatedBy = @UpdatedBy
-                               WHERE Id = @Id AND IsDeleted = FALSE
-                           """;
-
-        var affected = await connection.ExecuteAsync(sql, new
+        var employee = await ActiveEmployees().FirstOrDefaultAsync(e => e.Id == employeeId);
+        if (employee == null)
         {
-            Id = employeeId,
-            Status = (int)status,
-            UpdatedAt = DateTime.UtcNow,
-            UpdatedBy = "system"
-        });
+            return false;
+        }
 
-        return affected > 0;
+        employee.EmploymentStatus = status;
+        employee.UpdatedAt = DateTime.UtcNow;
+        employee.UpdatedBy = "system";
+
+        return await _context.SaveChangesAsync() > 0;
     }
-    
+
     public async Task<IEnumerable<EmployeeDto>> GetByTypeAsync(EmploymentType type)
     {
-        using var connection = _context.GetConnection();
-        const string sql = "SELECT * FROM Employee WHERE EmploymentType = @Type AND IsDeleted = FALSE";
-        var employees = await connection.QueryAsync<Employee>(sql, new { Type = (int)type });
+        var employees = await ActiveEmployees()
+            .AsNoTracking()
+            .Where(e => e.EmploymentType == type)
+            .ToListAsync();
+
         return _mapper.Map<IEnumerable<EmployeeDto>>(employees);
     }
 
     public async Task<bool> UpdateTypeAsync(int employeeId, EmploymentType type)
     {
-        using var connection = _context.GetConnection();
-
-        const string sql = """
-                               UPDATE Employee
-                               SET EmploymentType = @Type,
-                                   UpdatedAt = @UpdatedAt,
-                                   UpdatedBy = @UpdatedBy
-                               WHERE Id = @Id AND IsDeleted = FALSE
-                           """;
-
-        var affected = await connection.ExecuteAsync(sql, new
+        var employee = await ActiveEmployees().FirstOrDefaultAsync(e => e.Id == employeeId);
+        if (employee == null)
         {
-            Id = employeeId,
-            Type = (int)type,
-            UpdatedAt = DateTime.UtcNow,
-            UpdatedBy = "system"
-        });
+            return false;
+        }
 
-        return affected > 0;
+        employee.EmploymentType = type;
+        employee.UpdatedAt = DateTime.UtcNow;
+        employee.UpdatedBy = "system";
+
+        return await _context.SaveChangesAsync() > 0;
     }
-    
+
+    public async Task<bool> UpdateRoleAsync(int employeeId, EmployeeRole role)
+    {
+        var employee = await ActiveEmployees().FirstOrDefaultAsync(e => e.Id == employeeId);
+        if (employee == null)
+        {
+            return false;
+        }
+
+        employee.Role = role;
+        employee.UpdatedAt = DateTime.UtcNow;
+        employee.UpdatedBy = "system";
+
+        return await _context.SaveChangesAsync() > 0;
+    }
+
+    public async Task<bool> SetDepartmentHrAsync(string department, int hrEmployeeId)
+    {
+        if (string.IsNullOrWhiteSpace(department))
+        {
+            throw new ArgumentException("Department is required", nameof(department));
+        }
+
+        var trimmedDepartment = department.Trim();
+        var hrEmployee = await ActiveEmployees().FirstOrDefaultAsync(e => e.Id == hrEmployeeId);
+        if (hrEmployee == null)
+        {
+            return false;
+        }
+
+        if (hrEmployee.Role != EmployeeRole.Hr)
+        {
+            throw new InvalidOperationException($"Employee {hrEmployeeId} must have HR role before being assigned as department HR");
+        }
+
+        var assignment = await _context.DepartmentHrAssignments
+            .FirstOrDefaultAsync(a => a.Department == trimmedDepartment);
+        if (assignment == null)
+        {
+            _context.DepartmentHrAssignments.Add(new DepartmentHrAssignment
+            {
+                Department = trimmedDepartment,
+                HrEmployeeId = hrEmployeeId,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            assignment.HrEmployeeId = hrEmployeeId;
+            assignment.UpdatedAt = DateTime.UtcNow;
+        }
+
+        return await _context.SaveChangesAsync() > 0;
+    }
+
     public async Task<bool> TerminateAsync(int employeeId, DateTime terminationDate)
     {
-        using var connection = _context.GetConnection();
-        const string checkSql = """
-                                    SELECT HireDate FROM Employee WHERE Id = @Id AND IsDeleted = FALSE
-                                """;
-    
-        var hireDate = await connection.QuerySingleOrDefaultAsync<DateTime?>(checkSql, new { Id = employeeId });
-    
-        if (hireDate == null)
-            return false;
-    
-        if (terminationDate < hireDate.Value)
-            throw new ArgumentException("Termination date cannot be before hire date");
-        
-        const string sql = """
-                               UPDATE Employee
-                               SET TerminationDate = @TerminationDate,
-                                   EmploymentStatus = @Status,
-                                   UpdatedAt = @UpdatedAt,
-                                   UpdatedBy = @UpdatedBy
-                               WHERE Id = @Id AND IsDeleted = FALSE
-                           """;
-    
-        var affected = await connection.ExecuteAsync(sql, new
+        var employee = await ActiveEmployees().FirstOrDefaultAsync(e => e.Id == employeeId);
+        if (employee == null)
         {
-            Id = employeeId,
-            TerminationDate = terminationDate,
-            Status = (int)EmploymentStatus.Terminated,
-            UpdatedAt = DateTime.UtcNow,
-            UpdatedBy = "system"
-        });
-    
-        return affected > 0;
+            return false;
+        }
+
+        if (terminationDate < employee.HireDate)
+        {
+            throw new ArgumentException("Termination date cannot be before hire date");
+        }
+
+        employee.TerminationDate = terminationDate;
+        employee.EmploymentStatus = EmploymentStatus.Terminated;
+        employee.UpdatedAt = DateTime.UtcNow;
+        employee.UpdatedBy = "system";
+
+        return await _context.SaveChangesAsync() > 0;
     }
 
     public async Task<PagedResultDto<EmployeeDto>> SearchAsync(
@@ -337,59 +324,42 @@ public class EmployeeRepository : IEmployeeRepository
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 100);
-        var offset = (page - 1) * pageSize;
-
-        using var connection = _context.GetConnection();
-        var parameters = new DynamicParameters();
-        parameters.Add("Offset", offset);
-        parameters.Add("PageSize", pageSize);
-
-        var filters = new List<string> { "IsDeleted = FALSE" };
+        var query = ActiveEmployees().AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            filters.Add("""
-                (
-                    FirstName ILIKE @Search OR
-                    LastName ILIKE @Search OR
-                    WorkEmail ILIKE @Search OR
-                    EmployeeNumber ILIKE @Search OR
-                    Position ILIKE @Search
-                )
-            """);
-            parameters.Add("Search", $"%{search.Trim()}%");
+            var pattern = $"%{search.Trim()}%";
+            query = query.Where(e =>
+                EF.Functions.ILike(e.FirstName, pattern) ||
+                EF.Functions.ILike(e.LastName, pattern) ||
+                EF.Functions.ILike(e.WorkEmail, pattern) ||
+                EF.Functions.ILike(e.EmployeeNumber, pattern) ||
+                EF.Functions.ILike(e.Position, pattern));
         }
 
         if (!string.IsNullOrWhiteSpace(department))
         {
-            filters.Add("Department = @Department");
-            parameters.Add("Department", department.Trim());
+            var trimmedDepartment = department.Trim();
+            query = query.Where(e => e.Department == trimmedDepartment);
         }
 
         if (status.HasValue)
         {
-            filters.Add("EmploymentStatus = @Status");
-            parameters.Add("Status", (int)status.Value);
+            query = query.Where(e => e.EmploymentStatus == status.Value);
         }
 
         if (type.HasValue)
         {
-            filters.Add("EmploymentType = @Type");
-            parameters.Add("Type", (int)type.Value);
+            query = query.Where(e => e.EmploymentType == type.Value);
         }
 
-        var whereClause = string.Join(" AND ", filters);
-        var countSql = $"SELECT COUNT(*) FROM Employee WHERE {whereClause}";
-        var dataSql = $"""
-            SELECT *
-            FROM Employee
-            WHERE {whereClause}
-            ORDER BY LastName, FirstName
-            OFFSET @Offset LIMIT @PageSize
-        """;
-
-        var totalCount = await connection.ExecuteScalarAsync<int>(countSql, parameters);
-        var employees = await connection.QueryAsync<Employee>(dataSql, parameters);
+        var totalCount = await query.CountAsync();
+        var employees = await query
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
 
         return new PagedResultDto<EmployeeDto>
         {
@@ -400,4 +370,26 @@ public class EmployeeRepository : IEmployeeRepository
         };
     }
 
+    private IQueryable<Employee> ActiveEmployees()
+    {
+        return _context.Employees.Where(e => !e.IsDeleted);
+    }
+
+    private async Task<string> GenerateEmployeeNumberAsync()
+    {
+        var lastEmployeeNumber = await _context.Employees
+            .Where(e => e.EmployeeNumber.StartsWith("EMP-"))
+            .OrderByDescending(e => e.Id)
+            .Select(e => e.EmployeeNumber)
+            .FirstOrDefaultAsync();
+
+        var nextNumber = 1;
+        if (!string.IsNullOrWhiteSpace(lastEmployeeNumber) &&
+            int.TryParse(lastEmployeeNumber["EMP-".Length..], out var currentNumber))
+        {
+            nextNumber = currentNumber + 1;
+        }
+
+        return $"EMP-{nextNumber:D6}";
+    }
 }

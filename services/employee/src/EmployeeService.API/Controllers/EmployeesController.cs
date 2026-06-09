@@ -219,6 +219,31 @@ public class EmployeesController : ControllerBase
         }
     }
 
+    [HttpGet("{id}/leave-approvers")]
+    [ProducesResponseType(typeof(LeaveApproversDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<LeaveApproversDto>> GetLeaveApprovers(int id)
+    {
+        try
+        {
+            var approvers = await _repository.GetLeaveApproversAsync(id);
+            if (approvers == null)
+                return NotFound($"Employee with ID {id} not found");
+
+            return Ok(approvers);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting leave approvers for employee: {Id}", id);
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(EmployeeDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -306,6 +331,55 @@ public class EmployeesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating employee type: {Id}", id);
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    [HttpPatch("{id}/role")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> UpdateRole(int id, [FromBody] EmployeeRole role)
+    {
+        try
+        {
+            var result = await _repository.UpdateRoleAsync(id, role);
+            if (!result)
+                return NotFound($"Employee with ID {id} not found");
+
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating employee role: {Id}", id);
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    [HttpPut("departments/{department}/hr/{hrEmployeeId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> SetDepartmentHr(string department, int hrEmployeeId)
+    {
+        try
+        {
+            var result = await _repository.SetDepartmentHrAsync(department, hrEmployeeId);
+            if (!result)
+                return NotFound($"HR employee with ID {hrEmployeeId} not found");
+
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning HR employee {HrEmployeeId} to department {Department}", hrEmployeeId, department);
             return StatusCode(500, "Internal server error");
         }
     }

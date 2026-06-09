@@ -52,6 +52,38 @@ public class EmployeeGrpcService : EmployeeProtoService.EmployeeProtoServiceBase
         return new EmployeeExistsResponse { Exists = exists };
     }
 
+    public override async Task<LeaveApproversResponse> GetLeaveApprovers(
+        GetLeaveApproversRequest request,
+        ServerCallContext context)
+    {
+        try
+        {
+            var approvers = await _repository.GetLeaveApproversAsync(request.EmployeeId);
+            if (approvers == null)
+            {
+                throw new RpcException(new Status(
+                    StatusCode.NotFound,
+                    $"Employee with ID {request.EmployeeId} not found"));
+            }
+
+            _logger.LogInformation("Retrieved leave approvers for employee {EmployeeId}", request.EmployeeId);
+            return new LeaveApproversResponse
+            {
+                EmployeeId = approvers.EmployeeId,
+                EmployeeNumber = approvers.EmployeeNumber,
+                ManagerId = approvers.ManagerId,
+                ManagerEmployeeNumber = approvers.ManagerEmployeeNumber,
+                HrEmployeeId = approvers.HrEmployeeId,
+                HrEmployeeNumber = approvers.HrEmployeeNumber,
+                Department = approvers.Department
+            };
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message));
+        }
+    }
+
     private static EmployeeForPayrollResponse MapToResponse(EmployeeForPayrollDto employee)
     {
         var response = new EmployeeForPayrollResponse

@@ -39,6 +39,8 @@ public class BaseEmployeeDto
 
     public int? ManagerId { get; set; }
 
+    public EmployeeRole Role { get; set; } = EmployeeRole.Employee;
+
     [Required(ErrorMessage = "Employment type is required")]
     public EmploymentType EmploymentType { get; set; }
 

@@ -21,6 +21,7 @@ public class EmployeeDto
     public DateTime DateOfBirth { get; set; }
     public string JMBG { get; set; } = string.Empty;
     public int? ManagerId { get; set; }
+    public EmployeeRole Role { get; set; }
     public DateTime HireDate { get; set; }
     public DateTime? ProbationEndDate { get; set; }
     public DateTime? TerminationDate { get; set; }

@@ -14,6 +14,7 @@ public interface IEmployeeRepository
     Task<IEnumerable<EmployeeDto>> GetAllAsync();
     Task<IEnumerable<EmployeeDto>> GetByDepartmentAsync(string department);
     Task<IEnumerable<EmployeeDto>> GetByManagerIdAsync(int managerId);
+    Task<LeaveApproversDto?> GetLeaveApproversAsync(int employeeId);
     Task<IEnumerable<EmployeeDto>> GetByStatusAsync(EmploymentStatus status);
     Task<IEnumerable<EmployeeDto>> GetByTypeAsync(EmploymentType type);
     Task<PagedResultDto<EmployeeDto>> SearchAsync(
@@ -30,6 +31,8 @@ public interface IEmployeeRepository
     
     Task<bool> UpdateStatusAsync(int employeeId, EmploymentStatus status);
     Task<bool> UpdateTypeAsync(int employeeId, EmploymentType type);
+    Task<bool> UpdateRoleAsync(int employeeId, EmployeeRole role);
+    Task<bool> SetDepartmentHrAsync(string department, int hrEmployeeId);
     
     Task<bool> TerminateAsync(int employeeId, DateTime terminationDate);
 }

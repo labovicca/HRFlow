@@ -16,6 +16,7 @@ public class Employee
     public required string Department { get; set; }
     public required string Position { get; set; }
     public int? ManagerId { get; set; }
+    public EmployeeRole Role { get; set; } = EmployeeRole.Employee;
     
     public required EmploymentType EmploymentType { get; set; }
     public required EmploymentStatus EmploymentStatus { get; set; }
