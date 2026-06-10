@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="leave.API/leave.API.csproj" />
+  <Project Path="leave.Domain/leave.Domain.csproj" />
+  <Project Path="leave.Persistance/leave.Persistance.csproj" Id="1e7a916d-f368-474a-9294-ecf0843db716" />
+</Solution>
