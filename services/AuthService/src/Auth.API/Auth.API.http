@@ -1,0 +1,6 @@
+@Auth_API_HostAddress = http://localhost:8001
+
+GET {{Auth_API_HostAddress}}/swagger/
+Accept: application/json
+
+###
