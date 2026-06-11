@@ -19,7 +19,7 @@ public class PayrollRunsController : ControllerBase
     }
 
     /// <summary>
-    /// Dohvati sve payroll run-ove sa opcionalnim filterima
+    /// Get all payroll runs with optional filters
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<PayrollRunListDto>), StatusCodes.Status200OK)]
@@ -36,7 +36,7 @@ public class PayrollRunsController : ControllerBase
     }
 
     /// <summary>
-    /// Dohvati payroll run po ID-u
+    /// Get payroll run by ID
     /// </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(PayrollRunDto), StatusCodes.Status200OK)]
@@ -55,7 +55,7 @@ public class PayrollRunsController : ControllerBase
     }
 
     /// <summary>
-    /// Kreiraj novi payroll run
+    /// Create a new payroll run
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(PayrollRunDto), StatusCodes.Status201Created)]
@@ -74,7 +74,7 @@ public class PayrollRunsController : ControllerBase
     }
 
     /// <summary>
-    /// Izvrši obračun plate za draft payroll run
+    /// Calculate payroll for a single draft payroll run
     /// </summary>
     [HttpPost("{id:guid}/calculate")]
     [ProducesResponseType(typeof(PayrollCalculationResult), StatusCodes.Status200OK)]
@@ -84,17 +84,30 @@ public class PayrollRunsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        // TODO: Get actual user from JWT token
         var updatedBy = "system";
-        
         var command = new CalculatePayrollCommand(id, updatedBy);
         var result = await _mediator.Send(command, cancellationToken);
-        
         return Ok(result);
     }
 
     /// <summary>
-    /// Odobri obračunati payroll run
+    /// Bulk calculate all Draft payroll runs for a given period (year/month)
+    /// </summary>
+    [HttpPost("bulk-calculate")]
+    [ProducesResponseType(typeof(BulkOperationResult), StatusCodes.Status200OK)]
+    public async Task<ActionResult<BulkOperationResult>> BulkCalculate(
+        [FromQuery] int year,
+        [FromQuery] int month,
+        CancellationToken cancellationToken)
+    {
+        var updatedBy = "system";
+        var command = new BulkCalculatePayrollCommand(year, month, updatedBy);
+        var result = await _mediator.Send(command, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Approve a calculated payroll run
     /// </summary>
     [HttpPost("{id:guid}/approve")]
     [ProducesResponseType(typeof(PayrollRunDto), StatusCodes.Status200OK)]
@@ -104,17 +117,31 @@ public class PayrollRunsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        // TODO: Get actual user from JWT token
         var approvedBy = "system";
-        
         var command = new ApprovePayrollRunCommand(id, approvedBy);
         var result = await _mediator.Send(command, cancellationToken);
-        
         return Ok(result);
     }
 
     /// <summary>
-    /// Generiši payslip PDF za payroll run
+    /// Mark an approved payroll run as Paid
+    /// </summary>
+    [HttpPost("{id:guid}/mark-paid")]
+    [ProducesResponseType(typeof(PayrollRunDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PayrollRunDto>> MarkAsPaid(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var paidBy = "system";
+        var command = new MarkPayrollAsPaidCommand(id, paidBy);
+        var result = await _mediator.Send(command, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Generate payslip PDF for a payroll run
     /// </summary>
     [HttpPost("{id:guid}/payslip")]
     [ProducesResponseType(typeof(PayslipDto), StatusCodes.Status200OK)]
@@ -131,7 +158,7 @@ public class PayrollRunsController : ControllerBase
     }
 
     /// <summary>
-    /// Preuzmi payslip PDF za payroll run
+    /// Download payslip PDF
     /// </summary>
     [HttpGet("{id:guid}/payslip/download")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
@@ -145,14 +172,29 @@ public class PayrollRunsController : ControllerBase
 
         if (result == null)
         {
-            return NotFound(new { message = "Payslip nije dostupan za ovaj payroll run" });
+            return NotFound(new { message = "Payslip not available for this payroll run" });
         }
 
         return File(result.FileBytes, result.ContentType, result.FileName);
     }
 
     /// <summary>
-    /// Obriši draft ili cancelled payroll run
+    /// Get monthly payroll summary/report
+    /// </summary>
+    [HttpGet("summary")]
+    [ProducesResponseType(typeof(PayrollSummaryDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PayrollSummaryDto>> GetSummary(
+        [FromQuery] int year,
+        [FromQuery] int month,
+        CancellationToken cancellationToken)
+    {
+        var query = new GetPayrollSummaryQuery(year, month);
+        var result = await _mediator.Send(query, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Delete a draft or cancelled payroll run
     /// </summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -162,7 +204,6 @@ public class PayrollRunsController : ControllerBase
     {
         var command = new DeletePayrollRunCommand(id);
         await _mediator.Send(command, cancellationToken);
-        
         return NoContent();
     }
 }
