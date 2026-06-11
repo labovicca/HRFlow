@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "EmployeeService.GRPC";
+
+service EmployeeProtoService {
+  rpc GetEmployeeForPayroll (GetEmployeeForPayrollRequest) returns (EmployeeForPayrollResponse);
+  rpc GetEmployeesForPayroll (GetEmployeesForPayrollRequest) returns (GetEmployeesForPayrollResponse);
+  rpc EmployeeExists (EmployeeExistsRequest) returns (EmployeeExistsResponse);
+  rpc GetLeaveApprovers (GetLeaveApproversRequest) returns (LeaveApproversResponse);
+}
+
+message GetEmployeeForPayrollRequest {
+  int32 employeeId = 1;
+}
+
+message GetEmployeesForPayrollRequest {
+  repeated int32 employeeIds = 1;
+}
+
+message EmployeeForPayrollResponse {
+  int32 id = 1;
+  string employeeNumber = 2;
+  string firstName = 3;
+  string lastName = 4;
+  string department = 5;
+  string position = 6;
+  string employmentType = 7;
+  string employmentStatus = 8;
+  google.protobuf.Timestamp hireDate = 9;
+  google.protobuf.Timestamp terminationDate = 10;
+}
+
+message GetEmployeesForPayrollResponse {
+  repeated EmployeeForPayrollResponse employees = 1;
+}
+
+message EmployeeExistsRequest {
+  int32 employeeId = 1;
+}
+
+message EmployeeExistsResponse {
+  bool exists = 1;
+}
+
+message GetLeaveApproversRequest {
+  int32 employeeId = 1;
+}
+
+message LeaveApproversResponse {
+  int32 employeeId = 1;
+  string employeeNumber = 2;
+  int32 managerId = 3;
+  string managerEmployeeNumber = 4;
+  int32 hrEmployeeId = 5;
+  string hrEmployeeNumber = 6;
+  string department = 7;
+}
